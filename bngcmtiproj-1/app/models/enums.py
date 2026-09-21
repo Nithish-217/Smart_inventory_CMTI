@@ -1,16 +1,10 @@
-import enum     
-
-
-print("enums.py loaded ✅")
+import enum
 
 
 class UserRole(str, enum.Enum):
     OFFICER = "OFFICER"
     SUPERVISOR = "SUPERVISOR"
     OPERATOR = "OPERATOR"
-
-print("UserRole in scope?", 'UserRole' in globals())
-print("Available globals:", list(globals().keys()))
 
 class RequestStatus(str, enum.Enum):
     PENDING = "PENDING"

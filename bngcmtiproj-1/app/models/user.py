@@ -3,8 +3,6 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 from app.models.enums import UserRole
 
-print("user.py loaded ✅")
-
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)

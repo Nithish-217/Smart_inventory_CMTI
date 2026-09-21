@@ -351,8 +351,6 @@ def collect_tool(
         sess, user = session_data
         operator_id = user.id
         
-        print(f"[DEBUG] Collect tool request: {request_id} by operator {operator_id}")
-        
         # Find the tool request
         request = db.execute(
             select(ToolUsageRequest)
@@ -363,10 +361,7 @@ def collect_tool(
         ).scalar_one_or_none()
         
         if not request:
-            print(f"[DEBUG] Tool request not found: {request_id}")
             raise HTTPException(status_code=404, detail="Tool request not found")
-        
-        print(f"[DEBUG] Found request with status: {request.status}")
         
         if request.status != RequestStatus.APPROVED:
             raise HTTPException(status_code=400, detail=f"Tool request status is {request.status}, not approved")
@@ -380,8 +375,6 @@ def collect_tool(
         request.status = RequestStatus.RECEIVED
         db.commit()
         
-        print(f"[DEBUG] Successfully updated status to COLLECTED")
-        
         return {
             "message": f"Tool {tool.tool_name} (ID: {tool.id}) collected successfully!",
             "tool_name": tool.tool_name,
@@ -392,5 +385,4 @@ def collect_tool(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[ERROR] Unexpected error in collect_tool: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from openai import OpenAI
 from typing import Dict, List, Optional
 import logging
 import json
@@ -7,18 +7,18 @@ from app.services.schema_selector import SchemaSelector
 
 logger = logging.getLogger(__name__)
 
-class GeminiService:
+class OpenAIService:
     def __init__(self):
-        if not settings.GOOGLE_API_KEY:
-            raise ValueError("GOOGLE_API_KEY is not configured")
+        if not settings.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY is not configured")
         
-        genai.configure(api_key=settings.GOOGLE_API_KEY)
-        self.model = genai.GenerativeModel(settings.GOOGLE_MODEL)
+        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.model = settings.OPENAI_MODEL
         self.schema_selector = SchemaSelector()
 
     def generate_sql(self, question: str) -> Dict[str, str]:
         """
-        Generate SQL from natural language question using Google Generative AI.
+        Generate SQL from natural language question using OpenAI.
         
         Args:
             question: Natural language question
@@ -36,21 +36,24 @@ class GeminiService:
             # Build system prompt
             system_prompt = self._build_system_prompt(schema_text)
             
-            # Call Gemini API
-            prompt = f"{system_prompt}\n\nQuestion: {question}\n\nGenerate the SQL required to answer this question. Return ONLY the SQL query, nothing else. Do not include any explanations or JSON formatting."
+            # Call OpenAI API
+            user_prompt = f"Question: {question}\n\nGenerate the SQL required to answer this question. Return ONLY the SQL query, nothing else. Do not include any explanations or JSON formatting."
             
-            logger.info(f"Sending prompt to Gemini: {prompt[:500]}...")
-            response = self.model.generate_content(prompt)
+            logger.info(f"Sending prompt to OpenAI: {user_prompt[:500]}...")
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1000
+            )
             
-            logger.info(f"Raw Gemini response: {response}")
-            logger.info(f"Response type: {type(response)}")
+            logger.info(f"Raw OpenAI response: {response}")
             
-            if hasattr(response, 'text'):
-                content = response.text.strip()
-                logger.info(f"Response text: {content}")
-            else:
-                logger.error("Response has no text attribute")
-                content = ""
+            content = response.choices[0].message.content.strip()
+            logger.info(f"Response text: {content}")
             
             # Clean up the response - remove markdown code blocks if present
             if content.startswith("```"):
@@ -70,7 +73,7 @@ class GeminiService:
             }
             
         except Exception as e:
-            logger.error(f"Google AI API error: {e}")
+            logger.error(f"OpenAI API error: {e}")
             raise
 
     def format_result(self, question: str, sql: str, data: List[Dict]) -> str:
@@ -90,13 +93,21 @@ Be concise and accurate. Do not invent information not present in the data."""
             # Format data for prompt
             data_str = str(data)
             
-            prompt = f"{system_prompt}\n\nQuestion: {question}\n\nDatabase result: {data_str}\n\nProvide a clear, natural language answer."
+            user_prompt = f"Question: {question}\n\nDatabase result: {data_str}\n\nProvide a clear, natural language answer."
             
             logger.info(f"Formatting result with data: {data_str}")
-            response = self.model.generate_content(prompt)
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
             
-            if response and hasattr(response, 'text'):
-                answer = response.text.strip()
+            if response and response.choices[0].message.content:
+                answer = response.choices[0].message.content.strip()
                 logger.info(f"AI formatted answer: {answer}")
                 
                 if not answer:
@@ -108,7 +119,7 @@ Be concise and accurate. Do not invent information not present in the data."""
                 
                 return answer
             else:
-                logger.error("AI response is invalid or has no text attribute")
+                logger.error("AI response is invalid or has no content")
                 # Fallback to simple formatting
                 if len(data) == 1:
                     return f"Found 1 record: {data[0]}"
@@ -143,6 +154,6 @@ CRITICAL RULES:
 
 IMPORTANT: The schema above is the ONLY schema available. Do not reference any tables or columns not listed above."""
 
-def get_gemini_service() -> GeminiService:
-    """Get Gemini service instance."""
-    return GeminiService()
+def get_openai_service() -> OpenAIService:
+    """Get OpenAI service instance."""
+    return OpenAIService()

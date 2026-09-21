@@ -53,17 +53,12 @@ def get_officer_notifications(db: OrmSession = Depends(get_db), session_data: tu
 @router.get("/tool-issues", response_model=list[ToolIssueOut])
 def list_tool_issues(db: OrmSession = Depends(get_db), session_data: tuple = Depends(get_current_session)):
     sess, user = session_data
-    print(f"[DEBUG] Officer {user.id} requesting tool issues")
     
     # Get all tool issues
     issues = db.execute(
         select(ToolIssue)
         .order_by(ToolIssue.created_at.desc())
     ).scalars().all()
-    
-    print(f"[DEBUG] Found {len(issues)} tool issues")
-    for issue in issues:
-        print(f"[DEBUG] Issue {issue.id}: status={issue.status}, tool_id={issue.tool_id}, operator_id={issue.operator_id}")
     
     # Return all required fields for each issue
     result = [
@@ -78,7 +73,6 @@ def list_tool_issues(db: OrmSession = Depends(get_db), session_data: tuple = Dep
         ) for issue in issues
     ]
     
-    print(f"[DEBUG] Returning {len(result)} issues")
     return result
 
 # New endpoint: Officer responds to tool issue

@@ -40,31 +40,13 @@ def get_supervisor_notifications(db: OrmSession = Depends(get_db), session_data:
 
 @router.get("/tool-requests", dependencies=[Depends(require_role(UserRole.SUPERVISOR))])
 def list_all_tool_requests(db: OrmSession = Depends(get_db)):
-    print("=== Supervisor tool-requests endpoint called ===")
-    
     try:
-        # First, let's check if there are any tool requests at all
-        all_requests = db.execute(select(ToolUsageRequest)).scalars().all()
-        print(f"Total tool requests in database: {len(all_requests)}")
-        
-        # Check if there are any tool inventory items
-        all_tools = db.execute(select(ToolInventory)).scalars().all()
-        print(f"Total tools in inventory: {len(all_tools)}")
-        
         # Join with inventory to get tool names - show ALL requests, not just pending
         rows = db.execute(
             select(ToolUsageRequest, ToolInventory.tool_name.label('tool_name'))
             .join(ToolInventory, ToolUsageRequest.tool_id == ToolInventory.id)
             .order_by(ToolUsageRequest.requested_at.desc())  # Show newest first
         ).all()
-        
-        print(f"Requests with tool names: {len(rows)}")
-        
-        # Print all tool requests made by operators to the supervisor terminal
-        print("--- All Operator Tool Requests ---")
-        for r in rows:
-            print(f"Request ID: {r.ToolUsageRequest.request_id}, Operator ID: {r.ToolUsageRequest.operator_id}, Tool: {r.tool_name}, Qty: {r.ToolUsageRequest.requested_qty}, Status: {r.ToolUsageRequest.status}, Requested At: {r.ToolUsageRequest.requested_at}")
-        print("----------------------------------")
         
         result = [
             {
@@ -80,7 +62,6 @@ def list_all_tool_requests(db: OrmSession = Depends(get_db)):
             } for r in rows
         ]
         
-        print(f"Returning {len(result)} requests")
         return result
         
     except Exception as e:
@@ -199,8 +180,6 @@ def get_tool_addition_requests(status: str = None, db: OrmSession = Depends(get_
     sess, user = session_data
     supervisor_id = user.id
     
-    print(f"[DEBUG] Getting tool addition requests for supervisor {supervisor_id}, status filter: {status}")
-    
     try:
         # Base query for supervisor's tool addition requests
         query = select(ToolAdditionRequest).where(ToolAdditionRequest.requested_by == supervisor_id)
@@ -209,12 +188,9 @@ def get_tool_addition_requests(status: str = None, db: OrmSession = Depends(get_
         if status:
             status_enum = RequestStatus(status.upper())
             query = query.where(ToolAdditionRequest.status == status_enum)
-            print(f"[DEBUG] Filtering by status: {status_enum}")
         
         # Execute query
         requests = db.execute(query.order_by(ToolAdditionRequest.created_at.desc())).scalars().all()
-        
-        print(f"[DEBUG] Found {len(requests)} tool addition requests")
         
         result = [
             {
@@ -232,9 +208,6 @@ def get_tool_addition_requests(status: str = None, db: OrmSession = Depends(get_
         return result
         
     except Exception as e:
-        print(f"[ERROR] Error fetching tool addition requests: {e}")
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.get("/logs/approved-usage", dependencies=[Depends(require_role(UserRole.SUPERVISOR))])
